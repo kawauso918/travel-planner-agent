@@ -97,8 +97,13 @@ def main():
         mobility_label = st.selectbox("移動手段", list(mobility_options.keys()), index=0)
         mobility = mobility_options[mobility_label]
         
-        # 制約条件
-        constraints_text = st.text_area("制約条件", placeholder="例: ベジタリアン対応、雨天時も楽しめる", value="")
+        # やりたいことリスト
+        constraints_text = st.text_area(
+            "やりたいこと・希望事項", 
+            placeholder="例: ベジタリアン対応のレストラン、雨天時も楽しめるプラン、予約必須のスポットは事前確認", 
+            value="",
+            help="旅行で実現したいことや希望事項を入力してください（1行に1つずつ）"
+        )
         constraints = [c.strip() for c in constraints_text.split("\n") if c.strip()] if constraints_text else []
         
         # Memory ON/OFF
