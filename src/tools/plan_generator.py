@@ -79,7 +79,15 @@ def _build_itinerary_prompt(input_data: PlanGenerateInput) -> str:
     style_desc = STYLE_CONFIG.get(style, {}).get("description", "標準")
     start_point = input_data.start_point or "未指定"
     mobility = input_data.mobility or "public"
-    constraints = ", ".join(input_data.constraints) if input_data.constraints else "なし"
+    # constraintsを整形（参考情報を含む）
+    constraints_list = []
+    for constraint in input_data.constraints:
+        if constraint.startswith("【参考情報】"):
+            # 参考情報はそのまま追加
+            constraints_list.append(constraint)
+        else:
+            constraints_list.append(constraint)
+    constraints = "\n".join(constraints_list) if constraints_list else "なし"
     
     # search_briefを整形
     search_brief_text = ""
@@ -96,6 +104,15 @@ def _build_itinerary_prompt(input_data: PlanGenerateInput) -> str:
     else:
         search_brief_text = "\n\n## 検索結果要約\n\n検索結果がありません。一般的な情報に基づいて提案しますが、すべて「要確認」と明記してください。\n"
     
+    # 参考情報（RAG）を抽出
+    reference_info = ""
+    if "【参考情報】" in constraints:
+        # 参考情報セクションを抽出
+        parts = constraints.split("【参考情報】")
+        if len(parts) > 1:
+            reference_info = "\n\n## 参考情報（ユーザーのお気に入り・メモ・過去旅程）\n\n" + parts[1]
+            constraints = parts[0].strip() if parts[0].strip() else "なし"
+    
     prompt = f"""以下の情報を基に旅行旅程をMarkdown形式で作成してください。
 
 ## 入力条件
@@ -107,7 +124,8 @@ def _build_itinerary_prompt(input_data: PlanGenerateInput) -> str:
 - **スタイル**: {style}（{style_desc}）
 - **出発地点**: {start_point}
 - **移動手段**: {mobility}
-- **制約条件**: {constraints}
+- **やりたいこと・希望事項**: {constraints}
+{reference_info}
 {search_brief_text}
 
 ## 出力形式（テンプレートv2.0準拠）
@@ -198,22 +216,28 @@ def _build_itinerary_prompt(input_data: PlanGenerateInput) -> str:
    - search_briefが少ない/空の場合は、一般的な提案をしつつ「要確認」と明記してください
    - **検索していない情報を「最新」や「現在の情報」と断言しないでください**
 
-2. **出典URLの明記**:
+2. **参考情報（RAG）の活用**:
+   - 参考情報セクションにユーザーのお気に入り・メモ・過去旅程がある場合は、積極的に活用してください
+   - お気に入りリストのスポットやレストランを旅程に組み込むことを推奨します
+   - 過去旅程の良い点を参考にしつつ、新しい提案も加えてください
+   - 旅行メモの情報（混雑時間、注意点など）を旅程に反映してください
+
+3. **出典URLの明記**:
    - 営業時間・料金・定休日などの重要情報には必ず出典URLを添えてください
    - 例：「金閣寺公式サイト（https://...）によると、営業時間は9:00-17:00です」
 
-3. **移動時間の警告**:
+4. **移動時間の警告**:
    - 1日の移動総時間が3時間を超える場合は、warningsセクションに「DayXの移動時間が3時間超（推定）」と記載してください
    - MVPでは推定でOKですが、推定である旨をcautionsに明記してください
 
-4. **予算内訳**:
+5. **予算内訳**:
    - transportation（交通費）
    - food（食事代）
    - activities（体験・入場料）
    - other（その他）
    - total（合計）
 
-5. **エラーハンドリング**:
+6. **エラーハンドリング**:
    - 情報が不確かな場合は「要確認」と明記
    - 矛盾情報がある場合は「情報源により異なります。公式サイトでの確認を推奨します」と記載
 

@@ -50,3 +50,6 @@ Thumbs.db
 *.log
 logs/
 
+# Knowledge Base Data
+knowledge_data/
+

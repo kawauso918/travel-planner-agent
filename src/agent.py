@@ -11,6 +11,7 @@ from src.tools.web_search import run_serp_search
 from src.tools.plan_generator import generate_itinerary
 from src.tools.plan_editor import edit_itinerary
 from src.memory import get_memory
+from src.knowledge import get_knowledge_base
 from src.prompts import SYSTEM_PROMPT, DEVELOPER_PROMPT
 from src.schemas import (
     PlanGenerateInput, PlanGenerateOutput,
@@ -142,7 +143,23 @@ def run_agent(user_input: Dict[str, Any], memory_enabled: bool = True) -> Dict[s
             if brief:
                 search_briefs.append(brief)
         
-        # 4. 旅程組み立て
+        # 4. RAG: 自前ナレッジの取得（お気に入り、メモ、過去旅程）
+        knowledge_base = get_knowledge_base()
+        relevant_knowledge = knowledge_base.search_relevant_knowledge(
+            destination=destination,
+            themes=themes if themes else [],
+            days=days
+        )
+        knowledge_text = knowledge_base.format_knowledge_for_prompt(relevant_knowledge)
+        
+        if knowledge_text:
+            logger.info(f"関連ナレッジを取得: favorites={len(relevant_knowledge['favorites'])}, memos={len(relevant_knowledge['memos'])}, itineraries={len(relevant_knowledge['past_itineraries'])}")
+        
+        # 5. 旅程組み立て（ナレッジ情報をconstraintsに追加）
+        enhanced_constraints = constraints.copy()
+        if knowledge_text:
+            enhanced_constraints.append(f"【参考情報】\n{knowledge_text}")
+        
         plan_input = PlanGenerateInput(
             destination=destination,
             days=days,
@@ -151,7 +168,7 @@ def run_agent(user_input: Dict[str, Any], memory_enabled: bool = True) -> Dict[s
             style=style,
             start_point=start_point,
             mobility=mobility,
-            constraints=constraints,
+            constraints=enhanced_constraints,
             search_brief=search_briefs
         )
         
@@ -197,6 +214,23 @@ def run_agent(user_input: Dict[str, Any], memory_enabled: bool = True) -> Dict[s
         if memory:
             memory.add_message("user", f"旅行計画作成: {destination}, {days}日, 予算={budget_total}")
             memory.add_message("assistant", output.get("itinerary_markdown", ""))
+        
+        # 過去旅程として保存（RAG用）
+        try:
+            knowledge_base.save_itinerary(
+                destination=destination,
+                days=days,
+                itinerary_markdown=output.get("itinerary_markdown", ""),
+                metadata={
+                    "budget_total": budget_total,
+                    "themes": themes,
+                    "style": style,
+                    "mobility": mobility
+                }
+            )
+            logger.info("過去旅程として保存しました")
+        except Exception as e:
+            logger.warning(f"過去旅程の保存に失敗: {e}")
         
         logger.info("旅行計画生成が正常に完了しました")
         return output

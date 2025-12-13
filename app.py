@@ -6,6 +6,7 @@ import streamlit as st
 from src.agent import run_agent
 from src.tools.plan_editor import edit_itinerary
 from src.schemas import PlanEditInput
+from src.knowledge import get_knowledge_base
 from src.logger import get_logger
 
 logger = get_logger("app")
@@ -115,6 +116,106 @@ def main():
             st.caption("✅ Memory有効：過去の会話履歴を参照します")
         else:
             st.caption("❌ Memory無効：毎回初回ユーザーとして対応します")
+        
+        # RAG（自前ナレッジ）管理
+        st.divider()
+        st.subheader("📚 マイナレッジ")
+        with st.expander("お気に入り・メモ・過去旅程を管理"):
+            knowledge_base = get_knowledge_base()
+            
+            # タブで機能を分ける
+            tab1, tab2, tab3 = st.tabs(["お気に入り", "旅行メモ", "過去旅程"])
+            
+            with tab1:
+                st.write("**お気に入りリスト**")
+                # お気に入りの追加
+                with st.form("add_favorite_form"):
+                    fav_name = st.text_input("名前 *", key="fav_name")
+                    fav_category = st.selectbox("カテゴリ", ["観光スポット", "レストラン", "ホテル", "ショップ", "その他"], key="fav_category")
+                    fav_location = st.text_input("場所", key="fav_location")
+                    fav_notes = st.text_area("メモ", key="fav_notes")
+                    fav_url = st.text_input("URL", key="fav_url")
+                    if st.form_submit_button("追加"):
+                        if fav_name:
+                            knowledge_base.add_favorite(fav_name, fav_category, fav_location, fav_notes, fav_url)
+                            st.success(f"✅ {fav_name}をお気に入りに追加しました")
+                            st.rerun()
+                
+                # お気に入りリストの表示
+                favorites = knowledge_base.get_favorites()
+                if favorites:
+                    for fav in favorites:
+                        with st.container():
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.write(f"**{fav.get('name')}** ({fav.get('category')})")
+                                if fav.get('location'):
+                                    st.caption(f"📍 {fav.get('location')}")
+                                if fav.get('notes'):
+                                    st.caption(f"📝 {fav.get('notes')}")
+                            with col2:
+                                if st.button("削除", key=f"del_fav_{fav.get('id')}"):
+                                    knowledge_base.remove_favorite(fav.get('id'))
+                                    st.rerun()
+                            st.divider()
+                else:
+                    st.info("お気に入りがありません")
+            
+            with tab2:
+                st.write("**旅行メモ**")
+                # メモの追加
+                with st.form("add_memo_form"):
+                    memo_title = st.text_input("タイトル *", key="memo_title")
+                    memo_content = st.text_area("内容 *", key="memo_content")
+                    memo_tags = st.text_input("タグ（カンマ区切り）", key="memo_tags")
+                    if st.form_submit_button("追加"):
+                        if memo_title and memo_content:
+                            tags = [t.strip() for t in memo_tags.split(",") if t.strip()] if memo_tags else []
+                            knowledge_base.add_memo(memo_title, memo_content, tags)
+                            st.success(f"✅ {memo_title}をメモに追加しました")
+                            st.rerun()
+                
+                # メモリストの表示
+                memos = knowledge_base.get_memos()
+                if memos:
+                    for memo in memos:
+                        with st.container():
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.write(f"**{memo.get('title')}**")
+                                st.caption(memo.get('content', '')[:200])
+                                if memo.get('tags'):
+                                    st.caption(f"🏷️ {', '.join(memo.get('tags', []))}")
+                            with col2:
+                                if st.button("削除", key=f"del_memo_{memo.get('id')}"):
+                                    knowledge_base.remove_memo(memo.get('id'))
+                                    st.rerun()
+                            st.divider()
+                else:
+                    st.info("メモがありません")
+            
+            with tab3:
+                st.write("**過去旅程**")
+                # 過去旅程の表示
+                itineraries = knowledge_base.get_itineraries(limit=10)
+                if itineraries:
+                    for itin in itineraries:
+                        with st.container():
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.write(f"**{itin.get('destination')} {itin.get('days')}日プラン**")
+                                st.caption(f"作成日: {itin.get('created_at', '')[:10]}")
+                                if itin.get('metadata'):
+                                    meta = itin.get('metadata', {})
+                                    if meta.get('themes'):
+                                        st.caption(f"テーマ: {', '.join(meta.get('themes', []))}")
+                            with col2:
+                                if st.button("削除", key=f"del_itinerary_{itin.get('id')}"):
+                                    knowledge_base.remove_itinerary(itin.get('id'))
+                                    st.rerun()
+                            st.divider()
+                else:
+                    st.info("過去旅程がありません（旅程を生成すると自動的に保存されます）")
     
     # メインコンテンツ
     col1, col2, col3 = st.columns(3)
