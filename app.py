@@ -65,18 +65,30 @@ def main():
         themes = st.multiselect("興味テーマを選択", theme_options, default=["グルメ"])
         
         # スタイル
-        style = st.selectbox("旅行スタイル", ["relaxed", "normal", "packed"], index=1)
+        style_options = {
+            "ゆったり": "relaxed",
+            "標準": "normal",
+            "充実": "packed"
+        }
         style_descriptions = {
             "relaxed": "ゆったり（1日3-4枠）",
             "normal": "標準（1日4-5枠）",
             "packed": "充実（1日5-6枠）"
         }
+        style_label = st.selectbox("旅行スタイル", list(style_options.keys()), index=1)
+        style = style_options[style_label]
         st.caption(f"※ {style_descriptions[style]}")
         
         # 任意項目
         st.subheader("オプション")
         start_point = st.text_input("出発地点", placeholder="例: 東京", value="")
-        mobility = st.selectbox("移動手段", ["public", "car", "walk"], index=0)
+        mobility_options = {
+            "公共交通機関": "public",
+            "車": "car",
+            "徒歩": "walk"
+        }
+        mobility_label = st.selectbox("移動手段", list(mobility_options.keys()), index=0)
+        mobility = mobility_options[mobility_label]
         
         # 制約条件
         constraints_text = st.text_area("制約条件", placeholder="例: ベジタリアン対応、雨天時も楽しめる", value="")
