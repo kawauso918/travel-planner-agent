@@ -2,7 +2,7 @@
 データスキーマ定義モジュール（テンプレートv2.0準拠）
 Tool A/B/C の入出力をPydanticで固定
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
@@ -130,3 +130,42 @@ class PlanEditOutput(BaseModel):
     updated_plan: str = Field(description="更新後の旅程（Markdown形式）")
     change_log: List[str] = Field(default_factory=list, description="変更履歴リスト")
     new_sources: List[str] = Field(default_factory=list, description="新規出典URLリスト")
+
+
+# ============================================
+# ユーザー入力検証スキーマ（改善提案）
+# ============================================
+
+class UserInputSchema(BaseModel):
+    """ユーザー入力の検証スキーマ（改善提案）"""
+    destination: str = Field(..., min_length=1, max_length=100, description="目的地")
+    days: int = Field(..., ge=1, le=30, description="旅行日数")
+    budget_total: Optional[int] = Field(None, ge=0, description="予算（円）")
+    themes: List[str] = Field(default_factory=list, description="興味テーマ")
+    style: str = Field(default="normal", description="旅行スタイル")
+    start_point: Optional[str] = Field(None, max_length=100, description="出発地点")
+    mobility: str = Field(default="public", description="移動手段")
+    constraints: List[str] = Field(default_factory=list, description="制約条件")
+    
+    @validator('destination')
+    def validate_destination(cls, v):
+        """目的地の検証"""
+        if not v or not v.strip():
+            raise ValueError('目的地が空です')
+        return v.strip()
+    
+    @validator('style')
+    def validate_style(cls, v):
+        """スタイルの検証"""
+        allowed = ['relaxed', 'normal', 'packed']
+        if v not in allowed:
+            raise ValueError(f'スタイルは {allowed} のいずれかである必要があります')
+        return v
+    
+    @validator('mobility')
+    def validate_mobility(cls, v):
+        """移動手段の検証"""
+        allowed = ['public', 'car', 'walk']
+        if v not in allowed:
+            raise ValueError(f'移動手段は {allowed} のいずれかである必要があります')
+        return v

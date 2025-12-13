@@ -19,6 +19,27 @@ if "memory_enabled" not in st.session_state:
     st.session_state.memory_enabled = True
 
 
+def _handle_error(e: Exception, context: str, user_message: str = None) -> None:
+    """
+    共通のエラーハンドリング
+    
+    Args:
+        e: 例外オブジェクト
+        context: エラーが発生したコンテキスト（例: "旅程生成"）
+        user_message: ユーザー向けのカスタムメッセージ（Noneの場合はデフォルトメッセージ）
+    """
+    logger.error(f"{context}でエラーが発生: {type(e).__name__}: {str(e)}", exc_info=True)
+    st.error(f"❌ エラーが発生しました: {str(e)}")
+    
+    if user_message:
+        st.info(user_message)
+    else:
+        st.info("💡 別の条件で再試行するか、しばらく時間をおいてから再度お試しください。")
+    
+    with st.expander("エラー詳細（開発者向け）"):
+        st.exception(e)
+
+
 def main():
     st.set_page_config(
         page_title="Travel Planner Agent",
@@ -116,13 +137,7 @@ def main():
                     _display_plan_output(output)
             
             except Exception as e:
-                # 例外で画面が落ちないようにエラーを表示
-                logger.error(f"旅程生成でエラーが発生: {type(e).__name__}: {str(e)}", exc_info=True)
-                st.error(f"❌ エラーが発生しました: {str(e)}")
-                st.info("💡 別の条件で再試行するか、しばらく時間をおいてから再度お試しください。")
-                # 詳細は開発者向けに表示（ユーザーには見せない方が良い場合はコメントアウト）
-                with st.expander("エラー詳細（開発者向け）"):
-                    st.exception(e)
+                _handle_error(e, "旅程生成")
     
     # 再生成
     elif regenerate_btn:
@@ -156,12 +171,7 @@ def main():
                     _display_plan_output(output)
             
             except Exception as e:
-                # 例外で画面が落ちないようにエラーを表示
-                logger.error(f"再生成でエラーが発生: {type(e).__name__}: {str(e)}", exc_info=True)
-                st.error(f"❌ エラーが発生しました: {str(e)}")
-                st.info("💡 別の条件で再試行するか、しばらく時間をおいてから再度お試しください。")
-                with st.expander("エラー詳細（開発者向け）"):
-                    st.exception(e)
+                _handle_error(e, "再生成")
     
     # 編集
     elif edit_btn:
@@ -212,12 +222,7 @@ def main():
                             _display_plan_output(st.session_state.last_output)
                     
                     except Exception as e:
-                        # 例外で画面が落ちないようにエラーを表示
-                        logger.error(f"旅程編集でエラーが発生: {type(e).__name__}: {str(e)}", exc_info=True)
-                        st.error(f"❌ エラーが発生しました: {str(e)}")
-                        st.info("💡 修正内容を変更するか、しばらく時間をおいてから再度お試しください。")
-                        with st.expander("エラー詳細（開発者向け）"):
-                            st.exception(e)
+                        _handle_error(e, "旅程編集", "💡 修正内容を変更するか、しばらく時間をおいてから再度お試しください。")
     
     # 既存の計画を表示
     if st.session_state.last_output and not (generate_btn or regenerate_btn or edit_btn):
@@ -294,13 +299,7 @@ def _display_plan_output(output: dict):
                 st.error(f"⚠️ {warning}")
     
     except Exception as e:
-        # 表示エラーが発生しても画面が落ちないように
-        logger.error(f"表示エラーが発生: {type(e).__name__}: {str(e)}", exc_info=True)
-        st.error(f"❌ 表示エラーが発生しました: {str(e)}")
-        st.info("💡 ページを再読み込みするか、別の条件で再試行してください。")
-        # 詳細は開発者向けに表示
-        with st.expander("エラー詳細（開発者向け）"):
-            st.exception(e)
+        _handle_error(e, "表示", "💡 ページを再読み込みするか、別の条件で再試行してください。")
 
 
 def _translate_budget_key(key: str) -> str:
