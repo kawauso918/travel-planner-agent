@@ -57,7 +57,14 @@ def main():
         # 必須項目
         destination = st.text_input("目的地 *", placeholder="例: 京都", value="")
         days = st.number_input("滞在日数 *", min_value=1, max_value=30, value=3)
-        budget_total = st.number_input("予算（円）", min_value=0, value=50000, step=1000)
+        budget_total = st.number_input(
+            "予算（円） *", 
+            min_value=0, 
+            value=50000, 
+            step=1000,
+            help="宿泊費・交通費・食事代・体験費を含む総予算を入力してください"
+        )
+        st.caption("💡 宿泊費、交通費、食事代、体験・入場料、その他を含む総予算です")
         
         # テーマ（複数選択）
         st.subheader("興味テーマ")
