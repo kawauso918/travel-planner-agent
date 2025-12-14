@@ -134,7 +134,30 @@ source env/bin/activate  # Windows: env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### 4. 環境変数の設定
+#### 4. 日本語フォントのセットアップ（PDF出力機能を使用する場合）
+
+PDF出力機能で日本語を正しく表示するため、以下のいずれかの方法でフォントをセットアップしてください：
+
+**方法1: 同梱フォントを使用（推奨）**
+
+1. [Google Fonts - Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) から `NotoSansJP-Regular.ttf` をダウンロード
+2. ダウンロードしたファイルを `fonts/` ディレクトリに配置
+
+```bash
+# または、curlで直接ダウンロード
+curl -L -o fonts/NotoSansJP-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP-Regular.ttf"
+```
+
+**方法2: システムフォントを使用**
+
+システムに日本語フォントがインストールされている場合、自動的に検出して使用します：
+- macOS: ヒラギノ角ゴシック
+- Linux: Noto Sans CJK
+- Windows: MS Gothic/MS Mincho
+
+> **注意**: Streamlit Community Cloudでデプロイする場合は、**方法1（同梱フォント）を推奨**します。システムフォントが利用できない可能性があるためです。
+
+#### 5. 環境変数の設定
 
 `.env.example`を参考に`.env`ファイルを作成し、APIキーを設定してください：
 
@@ -146,7 +169,7 @@ OPENAI_MODEL=gpt-4
 
 詳細は[Security](#security)セクションを参照してください。
 
-#### 5. アプリケーションの起動
+#### 6. アプリケーションの起動
 
 ```bash
 streamlit run app.py

@@ -53,3 +53,6 @@ logs/
 # Knowledge Base Data
 knowledge_data/
 
+# Fonts (管理対象なので除外しない)
+# fonts/
+

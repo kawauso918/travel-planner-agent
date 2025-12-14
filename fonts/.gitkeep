@@ -1,0 +1,9 @@
+# このディレクトリには NotoSansJP-Regular.ttf を配置してください
+# 
+# ダウンロード方法:
+# 1. Google Fonts から Noto Sans JP をダウンロード
+#    https://fonts.google.com/noto/specimen/Noto+Sans+JP
+# 2. Regular フォントファイル（NotoSansJP-Regular.ttf）をこのディレクトリに配置
+#
+# または、以下のコマンドでダウンロード（curl使用）:
+# curl -L -o fonts/NotoSansJP-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP-Regular.ttf"

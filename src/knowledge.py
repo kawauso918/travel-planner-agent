@@ -119,8 +119,14 @@ class KnowledgeBase:
         Returns:
             成功した場合True
         """
+        # 既存のIDを確認して、一意のIDを生成
+        existing_ids = {fav.get("id") for fav in self.favorites if fav.get("id")}
+        new_id = 1
+        while new_id in existing_ids:
+            new_id += 1
+        
         favorite = {
-            "id": len(self.favorites) + 1,
+            "id": new_id,
             "name": name,
             "category": category,
             "location": location,
@@ -130,7 +136,7 @@ class KnowledgeBase:
         }
         self.favorites.append(favorite)
         self._save_favorites()
-        logger.info(f"お気に入りを追加: {name} ({category})")
+        logger.info(f"お気に入りを追加: ID={new_id}, name={name}, category={category}")
         return True
     
     def get_favorites(self, category: Optional[str] = None, location: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -249,8 +255,14 @@ class KnowledgeBase:
         Returns:
             保存された旅程のID
         """
+        # 既存のIDを確認して、一意のIDを生成
+        existing_ids = {itinerary.get("id") for itinerary in self.past_itineraries if itinerary.get("id")}
+        new_id = 1
+        while new_id in existing_ids:
+            new_id += 1
+        
         itinerary = {
-            "id": len(self.past_itineraries) + 1,
+            "id": new_id,
             "destination": destination,
             "days": days,
             "itinerary_markdown": itinerary_markdown,
@@ -259,8 +271,8 @@ class KnowledgeBase:
         }
         self.past_itineraries.append(itinerary)
         self._save_itineraries()
-        logger.info(f"過去旅程を保存: {destination} ({days}日)")
-        return itinerary["id"]
+        logger.info(f"過去旅程を保存: ID={new_id}, destination={destination}, days={days}")
+        return new_id
     
     def get_itineraries(self, destination: Optional[str] = None, days: Optional[int] = None, limit: int = 10) -> List[Dict[str, Any]]:
         """

@@ -8,6 +8,8 @@ from src.tools.plan_editor import edit_itinerary
 from src.schemas import PlanEditInput
 from src.knowledge import get_knowledge_base
 from src.logger import get_logger
+from src.export import generate_pdf, generate_ics, generate_map_links, _build_pdf_title, _sanitize_filename, build_google_maps_url
+from datetime import datetime
 
 logger = get_logger("app")
 
@@ -16,6 +18,10 @@ if "current_plan" not in st.session_state:
     st.session_state.current_plan = None
 if "last_output" not in st.session_state:
     st.session_state.last_output = None
+if "showing_favorite_detail" not in st.session_state:
+    st.session_state.showing_favorite_detail = False
+if "favorite_detail_data" not in st.session_state:
+    st.session_state.favorite_detail_data = None
 if "memory_enabled" not in st.session_state:
     st.session_state.memory_enabled = True
 if "show_edit_form" not in st.session_state:
@@ -239,7 +245,12 @@ def main():
                 # お気に入りリストの表示
                 favorites = knowledge_base.get_favorites()
                 if favorites:
-                    for fav in favorites:
+                    for idx, fav in enumerate(favorites):
+                        favorite_id = fav.get('id', idx)
+                        created_at = fav.get('created_at', '')
+                        # 一意のキーを生成（ID + インデックス + 作成日時）
+                        unique_key_suffix = f"{favorite_id}_{idx}_{created_at}"
+                        
                         with st.container():
                             col1, col2, col3 = st.columns([3, 1, 1])
                             with col1:
@@ -249,29 +260,44 @@ def main():
                                 if fav.get('notes'):
                                     st.caption(f"📝 {fav.get('notes')[:100]}{'...' if len(fav.get('notes', '')) > 100 else ''}")
                             with col2:
-                                if st.button("詳細", key=f"view_fav_{fav.get('id')}"):
-                                    # お気に入りの詳細をメイン画面に表示
-                                    detail_text = f"## 📌 {fav.get('name')}\n\n"
-                                    detail_text += f"**カテゴリ:** {fav.get('category')}\n\n"
-                                    if fav.get('location'):
-                                        detail_text += f"**場所:** {fav.get('location')}\n\n"
-                                    if fav.get('notes'):
-                                        detail_text += f"**メモ:**\n{fav.get('notes')}\n\n"
-                                    if fav.get('url'):
-                                        detail_text += f"**リンク:** [{fav.get('url')}]({fav.get('url')})\n\n"
+                                if st.button("詳細", key=f"view_fav_{unique_key_suffix}"):
+                                    try:
+                                        # お気に入りの詳細をメイン画面に表示
+                                        detail_text = f"## 📌 {fav.get('name')}\n\n"
+                                        detail_text += f"**カテゴリ:** {fav.get('category')}\n\n"
+                                        if fav.get('location'):
+                                            detail_text += f"**場所:** {fav.get('location')}\n\n"
+                                        if fav.get('notes'):
+                                            detail_text += f"**メモ:**\n{fav.get('notes')}\n\n"
+                                        if fav.get('url'):
+                                            detail_text += f"**リンク:** [{fav.get('url')}]({fav.get('url')})\n\n"
 
-                                    st.session_state.current_plan = detail_text
-                                    st.session_state.last_output = {
-                                        "itinerary_markdown": detail_text,
-                                        "budget_breakdown": {},
-                                        "cautions": [],
-                                        "sources": [],
-                                        "warnings": []
-                                    }
-                                    st.rerun()
+                                        st.session_state.current_plan = detail_text
+                                        st.session_state.current_destination = fav.get('location', fav.get('name', '旅行先'))
+                                        st.session_state.current_days = 1
+                                        st.session_state.showing_favorite_detail = True  # お気に入り詳細表示フラグ
+                                        st.session_state.favorite_detail_data = {  # お気に入り詳細データを保存
+                                            "name": fav.get('name'),
+                                            "category": fav.get('category'),
+                                            "location": fav.get('location'),
+                                            "notes": fav.get('notes'),
+                                            "url": fav.get('url')
+                                        }
+                                        st.session_state.last_output = {
+                                            "itinerary_markdown": detail_text,
+                                            "budget_breakdown": {},
+                                            "cautions": [],
+                                            "sources": [],
+                                            "warnings": []
+                                        }
+                                        st.success("✅ お気に入りの詳細を表示しました")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ お気に入りの表示エラー: {str(e)}")
                             with col3:
-                                if st.button("削除", key=f"del_fav_{fav.get('id')}"):
-                                    knowledge_base.remove_favorite(fav.get('id'))
+                                if st.button("削除", key=f"del_fav_{unique_key_suffix}"):
+                                    knowledge_base.remove_favorite(favorite_id)
+                                    st.success(f"✅ {fav.get('name')}を削除しました")
                                     st.rerun()
                             st.divider()
                 else:
@@ -365,32 +391,50 @@ def main():
                 # 過去旅程の表示
                 itineraries = knowledge_base.get_itineraries(limit=10)
                 if itineraries:
-                    for itin in itineraries:
+                    for idx, itin in enumerate(itineraries):
+                        itinerary_id = itin.get('id', idx)
+                        created_at = itin.get('created_at', '')
+                        # 一意のキーを生成（ID + インデックス + 作成日時）
+                        unique_key_suffix = f"{itinerary_id}_{idx}_{created_at}"
+                        
                         with st.container():
                             col1, col2, col3 = st.columns([3, 1, 1])
                             with col1:
                                 st.write(f"**{itin.get('destination')} {itin.get('days')}日プラン**")
-                                st.caption(f"作成日: {itin.get('created_at', '')[:10]}")
+                                st.caption(f"作成日: {created_at[:10] if len(created_at) >= 10 else created_at}")
                                 if itin.get('metadata'):
                                     meta = itin.get('metadata', {})
                                     if meta.get('themes'):
                                         st.caption(f"テーマ: {', '.join(meta.get('themes', []))}")
                             with col2:
-                                if st.button("表示", key=f"view_itinerary_{itin.get('id')}"):
-                                    # 過去旅程をメイン画面に表示
-                                    itinerary_markdown = itin.get('itinerary_markdown', '')
-                                    st.session_state.current_plan = itinerary_markdown
-                                    st.session_state.last_output = {
-                                        "itinerary_markdown": itinerary_markdown,
-                                        "budget_breakdown": itin.get('metadata', {}).get('budget_breakdown', {}),
-                                        "cautions": [],
-                                        "sources": [],
-                                        "warnings": []
-                                    }
-                                    st.rerun()
+                                if st.button("表示", key=f"view_itinerary_{unique_key_suffix}"):
+                                    try:
+                                        # 過去旅程をメイン画面に表示
+                                        itinerary_markdown = itin.get('itinerary_markdown', '')
+                                        if not itinerary_markdown:
+                                            st.error("❌ 旅程データが見つかりませんでした")
+                                        else:
+                                            st.session_state.current_plan = itinerary_markdown
+                                            st.session_state.current_destination = itin.get('destination', '旅行先')
+                                            st.session_state.current_days = itin.get('days', 3)
+                                            # お気に入り詳細表示フラグをリセット
+                                            st.session_state.showing_favorite_detail = False
+                                            st.session_state.favorite_detail_data = None
+                                            st.session_state.last_output = {
+                                                "itinerary_markdown": itinerary_markdown,
+                                                "budget_breakdown": itin.get('metadata', {}).get('budget_breakdown', {}),
+                                                "cautions": itin.get('metadata', {}).get('cautions', []),
+                                                "sources": itin.get('metadata', {}).get('sources', []),
+                                                "warnings": itin.get('metadata', {}).get('warnings', [])
+                                            }
+                                            st.success("✅ 過去旅程を読み込みました")
+                                            st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ 過去旅程の表示エラー: {str(e)}")
                             with col3:
-                                if st.button("削除", key=f"del_itinerary_{itin.get('id')}"):
-                                    knowledge_base.remove_itinerary(itin.get('id'))
+                                if st.button("削除", key=f"del_itinerary_{unique_key_suffix}"):
+                                    knowledge_base.remove_itinerary(itinerary_id)
+                                    st.success(f"✅ 旅程を削除しました（ID: {itinerary_id}）")
                                     st.rerun()
                             st.divider()
                 else:
@@ -431,6 +475,13 @@ def main():
                     output = run_agent(user_input, memory_enabled=memory_enabled)
                     st.session_state.last_output = output
                     st.session_state.current_plan = output.get("itinerary_markdown", "")
+                    # エクスポート用に目的地と日数を保存
+                    st.session_state.current_destination = destination
+                    st.session_state.current_days = days
+                    
+                    # お気に入り詳細表示フラグをリセット
+                    st.session_state.showing_favorite_detail = False
+                    st.session_state.favorite_detail_data = None
                     
                     # 過去旅程を再読み込み（最新データを表示するため）
                     knowledge_base = get_knowledge_base()
@@ -445,6 +496,11 @@ def main():
                         st.warning("⚠️ 一部の情報が取得できませんでした。注意点をご確認ください。")
                     else:
                         st.success("✅ 旅行計画が作成されました！")
+                    
+                    # エクスポート機能を自動表示
+                    st.divider()
+                    st.subheader("📤 エクスポート・地図リンク")
+                    _display_export_section(output, destination, days)
                     
                     st.divider()
                     st.subheader("📋 生成された旅行計画")
@@ -475,6 +531,13 @@ def main():
                     output = run_agent(last_input, memory_enabled=memory_enabled)
                     st.session_state.last_output = output
                     st.session_state.current_plan = output.get("itinerary_markdown", "")
+                    # エクスポート用に目的地と日数を保存
+                    st.session_state.current_destination = last_input.get("destination", "旅行先")
+                    st.session_state.current_days = days
+                    
+                    # お気に入り詳細表示フラグをリセット
+                    st.session_state.showing_favorite_detail = False
+                    st.session_state.favorite_detail_data = None
                     
                     # 過去旅程を再読み込み（最新データを表示するため）
                     knowledge_base = get_knowledge_base()
@@ -489,6 +552,11 @@ def main():
                         st.warning("⚠️ 一部の情報が取得できませんでした。注意点をご確認ください。")
                     else:
                         st.success("✅ 別案の旅行計画が作成されました！")
+                    
+                    # エクスポート機能を自動表示
+                    st.divider()
+                    st.subheader("📤 エクスポート・地図リンク")
+                    _display_export_section(output, last_input.get("destination", "旅行先"), days)
                     
                     st.divider()
                     st.subheader("📋 再生成された旅行計画")
@@ -588,6 +656,178 @@ def main():
             _display_plan_output(st.session_state.last_output)
 
 
+def _display_export_section(output: dict, destination: str, days: int):
+    """
+    エクスポート機能（PDF/ICS/地図リンク）を表示
+    
+    Args:
+        output: PlanGenerateOutputスキーマに準拠した辞書
+        destination: 目的地
+        days: 旅行日数
+    """
+    try:
+        itinerary_markdown = output.get("itinerary_markdown", "")
+        if not itinerary_markdown:
+            st.warning("⚠️ 旅程データがありません")
+            return
+        
+        # 開始日入力（ICS生成用）
+        col_date1, col_date2 = st.columns(2)
+        with col_date1:
+            start_date = st.date_input(
+                "📅 旅行開始日（ICS生成用）",
+                value=datetime.now().date(),
+                key="export_start_date"
+            )
+        
+        # エクスポート用のタイトル情報を取得（お気に入り詳細データから）
+        favorite_data = st.session_state.get("favorite_detail_data")
+        pdf_title = None
+        pdf_favorite_name = None
+        pdf_spot_name = None
+        pdf_address = None
+        
+        if favorite_data:
+            pdf_favorite_name = favorite_data.get("name")
+            pdf_spot_name = favorite_data.get("name")
+            pdf_address = favorite_data.get("location")
+        
+        # PDFファイル名用のタイトルを決定
+        pdf_title_for_filename = _build_pdf_title(
+            user_title=pdf_title,
+            favorite_name=pdf_favorite_name,
+            spot_name=pdf_spot_name,
+            address=pdf_address if not pdf_favorite_name else None
+        )
+        # お気に入りがない場合は目的地を使用
+        if not pdf_title_for_filename or pdf_title_for_filename == "旅行プラン":
+            pdf_title_for_filename = destination
+        sanitized_title = _sanitize_filename(pdf_title_for_filename)
+        
+        # 3列レイアウト
+        col1, col2, col3 = st.columns(3)
+        
+        # PDF出力
+        with col1:
+            st.markdown("### 📄 PDF出力")
+            pdf_key = "pdf_download_data_auto"
+            try:
+                pdf_buffer = generate_pdf(
+                    itinerary_markdown=itinerary_markdown,
+                    destination=destination,
+                    days=days,
+                    title=pdf_title,
+                    favorite_name=pdf_favorite_name,
+                    spot_name=pdf_spot_name,
+                    address=pdf_address
+                )
+                if pdf_buffer:
+                    st.session_state[pdf_key] = pdf_buffer.getvalue()
+                    st.session_state["pdf_filename_auto"] = f"travel_plan_{sanitized_title}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                    st.success("✅ PDF生成完了")
+                    
+                    # ダウンロードボタン
+                    pdf_filename = st.session_state.get("pdf_filename_auto", f"travel_plan_{destination}_{datetime.now().strftime('%Y%m%d')}.pdf")
+                    st.download_button(
+                        label="📥 PDFをダウンロード",
+                        data=st.session_state[pdf_key],
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="download_pdf_auto_btn"
+                    )
+            except ImportError as e:
+                st.error("❌ reportlabがインストールされていません")
+                with st.expander("📦 インストール方法", expanded=False):
+                    st.code("pip install reportlab", language="bash")
+            except Exception as e:
+                st.error(f"❌ PDF生成エラー: {str(e)}")
+                logger.error(f"PDF生成エラー: {str(e)}", exc_info=True)
+        
+        # ICS出力
+        with col2:
+            st.markdown("### 📅 ICS出力")
+            ics_key = "ics_download_data_auto"
+            
+            # タイトルを決定（PDFと同じロジック）
+            ics_title = _build_pdf_title(
+                user_title=pdf_title,
+                favorite_name=pdf_favorite_name,
+                spot_name=pdf_spot_name,
+                address=pdf_address if not pdf_favorite_name else None
+            )
+            if not ics_title or ics_title == "旅行プラン":
+                ics_title = destination
+            
+            try:
+                # 開始日をdatetime型に変換
+                start_datetime = datetime.combine(start_date, datetime.min.time())
+                
+                ics_buffer = generate_ics(
+                    itinerary_markdown=itinerary_markdown,
+                    destination=destination,
+                    days=days,
+                    start_date=start_datetime,
+                    title=ics_title
+                )
+                if ics_buffer:
+                    st.session_state[ics_key] = ics_buffer.getvalue()
+                    st.success("✅ ICS生成完了")
+                    
+                    # ダウンロードボタン
+                    ics_filename = f"travel_plan_{sanitized_title}_{datetime.now().strftime('%Y%m%d')}.ics"
+                    st.download_button(
+                        label="📥 ICSをダウンロード",
+                        data=st.session_state[ics_key],
+                        file_name=ics_filename,
+                        mime="text/calendar",
+                        use_container_width=True,
+                        key="download_ics_auto_btn"
+                    )
+            except ImportError as e:
+                st.error("❌ icalendarがインストールされていません")
+                with st.expander("📦 インストール方法", expanded=False):
+                    st.code("pip install icalendar", language="bash")
+            except Exception as e:
+                st.error(f"❌ ICS生成エラー: {str(e)}")
+                logger.error(f"ICS生成エラー: {str(e)}", exc_info=True)
+        
+        # 地図リンク
+        with col3:
+            st.markdown("### 🗺️ 地図リンク")
+            try:
+                # 目的地のGoogle Mapsリンクを生成
+                destination_map_url = build_google_maps_url(destination)
+                
+                # 地図リンクを表示
+                st.success("✅ 地図リンクを生成しました")
+                st.markdown(f"**目的地:**")
+                st.markdown(f"🔗 [{destination}]({destination_map_url})")
+                
+                # その他の場所情報も表示（オプション）
+                map_links = generate_map_links(
+                    itinerary_markdown=itinerary_markdown,
+                    destination=destination
+                )
+                if map_links:
+                    with st.expander("📍 その他の場所情報", expanded=False):
+                        for link in map_links[:10]:  # 最大10件まで表示
+                            location = link.get('location', link.get('name', ''))
+                            st.markdown(f"- **{location}**")
+                            st.markdown(f"  [{link['url']}]({link['url']})")
+                            st.markdown("")
+            except Exception as e:
+                st.error(f"❌ 地図リンク生成エラー: {str(e)}")
+                # エラー時でも目的地のリンクは表示
+                destination_map_url = build_google_maps_url(destination)
+                st.info("📍 目的地の地図リンク:")
+                st.markdown(f"[{destination}]({destination_map_url})")
+    
+    except Exception as e:
+        logger.error(f"エクスポートセクション表示エラー: {str(e)}", exc_info=True)
+        st.error(f"❌ エクスポート機能の表示でエラーが発生しました: {str(e)}")
+
+
 def _display_plan_output(output: dict):
     """
     旅行計画の出力を表示
@@ -602,11 +842,190 @@ def _display_plan_output(output: dict):
         if output is None:
             st.error("❌ 出力が取得できませんでした。")
             return
-        # 1. 旅程（Markdown）
-        itinerary_markdown = output.get("itinerary_markdown", "")
-        if itinerary_markdown:
+        
+        # お気に入りの詳細を表示（エクスポートの上）
+        if st.session_state.get("showing_favorite_detail", False) and st.session_state.get("favorite_detail_data"):
+            fav_data = st.session_state.favorite_detail_data
             st.markdown("---")
-            st.markdown(itinerary_markdown)
+            st.subheader("📌 お気に入りの詳細")
+            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown(f"### {fav_data.get('name', '')}")
+                if fav_data.get('category'):
+                    st.markdown(f"**カテゴリ:** {fav_data.get('category')}")
+                if fav_data.get('location'):
+                    st.markdown(f"**場所:** {fav_data.get('location')}")
+                if fav_data.get('notes'):
+                    st.markdown(f"**メモ:**")
+                    st.markdown(fav_data.get('notes'))
+                if fav_data.get('url'):
+                    st.markdown(f"**リンク:** [{fav_data.get('url')}]({fav_data.get('url')})")
+            
+            with col2:
+                if st.button("❌ 詳細を閉じる", use_container_width=True, key="close_favorite_detail_btn"):
+                    st.session_state.showing_favorite_detail = False
+                    st.session_state.favorite_detail_data = None
+                    st.session_state.current_plan = None
+                    st.session_state.last_output = None
+                    st.rerun()
+            
+            st.markdown("---")
+        
+        # エクスポート機能
+        st.markdown("---")
+        st.subheader("📤 エクスポート")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        # 目的地と日数を取得（セッション状態から）
+        export_destination = st.session_state.get("current_destination", "旅行先")
+        export_days = st.session_state.get("current_days", 3)
+        itinerary_markdown = output.get("itinerary_markdown", "")
+        
+        # お気に入り詳細データからタイトル情報を取得
+        favorite_data = st.session_state.get("favorite_detail_data")
+        pdf_title = None
+        pdf_favorite_name = None
+        pdf_spot_name = None
+        pdf_address = None
+        
+        if favorite_data:
+            pdf_favorite_name = favorite_data.get("name")
+            pdf_spot_name = favorite_data.get("name")  # お気に入り名をスポット名としても使用
+            pdf_address = favorite_data.get("location")
+        
+        # PDFファイル名用のタイトルを決定
+        pdf_title_for_filename = _build_pdf_title(
+            user_title=pdf_title,
+            favorite_name=pdf_favorite_name,
+            spot_name=pdf_spot_name,
+            address=pdf_address if not pdf_favorite_name else None
+        )
+        # お気に入りがない場合は目的地を使用
+        if not pdf_title_for_filename or pdf_title_for_filename == "旅行プラン":
+            pdf_title_for_filename = export_destination
+        sanitized_title = _sanitize_filename(pdf_title_for_filename)
+        
+        with col1:
+            pdf_key = "pdf_download_data"
+            if st.button("📄 PDF出力", use_container_width=True, key="export_pdf_btn"):
+                try:
+                    pdf_buffer = generate_pdf(
+                        itinerary_markdown=itinerary_markdown,
+                        destination=export_destination,
+                        days=export_days,
+                        title=pdf_title,
+                        favorite_name=pdf_favorite_name,
+                        spot_name=pdf_spot_name,
+                        address=pdf_address
+                    )
+                    if pdf_buffer:
+                        st.session_state[pdf_key] = pdf_buffer.getvalue()
+                        st.session_state["pdf_filename"] = f"travel_plan_{sanitized_title}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                        st.success("✅ PDFを生成しました。下のボタンからダウンロードしてください。")
+                except ImportError as e:
+                    st.error("❌ reportlabがインストールされていません")
+                    with st.expander("📦 インストール方法", expanded=True):
+                        st.code("pip install reportlab", language="bash")
+                        st.markdown("""
+                        **または、requirements.txtからすべての依存関係をインストール:**
+                        ```bash
+                        pip install -r requirements.txt
+                        ```
+                        """)
+                except Exception as e:
+                    st.error(f"❌ PDF生成エラー: {str(e)}")
+                    logger.error(f"PDF生成エラー: {str(e)}", exc_info=True)
+            
+            # PDFダウンロードボタン
+            if pdf_key in st.session_state:
+                # ファイル名を取得（タイトルベース、なければデフォルト）
+                pdf_filename = st.session_state.get(
+                    "pdf_filename",
+                    f"travel_plan_{export_destination}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                )
+                st.download_button(
+                    label="📥 PDFをダウンロード",
+                    data=st.session_state[pdf_key],
+                    file_name=pdf_filename,
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="download_pdf_btn"
+                )
+        
+        with col2:
+            ics_key = "ics_download_data"
+            if st.button("📅 ICS出力", use_container_width=True, key="export_ics_btn"):
+                try:
+                    ics_buffer = generate_ics(
+                        itinerary_markdown=itinerary_markdown,
+                        destination=export_destination,
+                        days=export_days
+                    )
+                    if ics_buffer:
+                        st.session_state[ics_key] = ics_buffer.getvalue()
+                        st.success("✅ ICSを生成しました。下のボタンからダウンロードしてください。")
+                except ImportError as e:
+                    st.error("❌ icalendarがインストールされていません")
+                    with st.expander("📦 インストール方法", expanded=True):
+                        st.code("pip install icalendar", language="bash")
+                        st.markdown("""
+                        **または、requirements.txtからすべての依存関係をインストール:**
+                        ```bash
+                        pip install -r requirements.txt
+                        ```
+                        """)
+                except Exception as e:
+                    st.error(f"❌ ICS生成エラー: {str(e)}")
+                    logger.error(f"ICS生成エラー: {str(e)}", exc_info=True)
+            
+            # ICSダウンロードボタン
+            if ics_key in st.session_state:
+                st.download_button(
+                    label="📥 ICSをダウンロード",
+                    data=st.session_state[ics_key],
+                    file_name=f"travel_plan_{export_destination}_{datetime.now().strftime('%Y%m%d')}.ics",
+                    mime="text/calendar",
+                    use_container_width=True,
+                    key="download_ics_btn"
+                )
+        
+        with col3:
+            map_links_key = "map_links_data"
+            if st.button("🗺️ 地図リンク", use_container_width=True, key="export_map_btn"):
+                try:
+                    map_links = generate_map_links(
+                        itinerary_markdown=itinerary_markdown,
+                        destination=export_destination
+                    )
+                    if map_links:
+                        st.session_state[map_links_key] = map_links
+                        st.session_state["show_map_links"] = True
+                        st.success(f"✅ 地図リンクを生成しました（{len(map_links)}件）")
+                    else:
+                        st.warning("⚠️ 地図リンクを生成できませんでした")
+                except Exception as e:
+                    st.error(f"❌ 地図リンク生成エラー: {str(e)}")
+            
+            # 地図リンクを表示（場所情報のみ）
+            if st.session_state.get("show_map_links", False) and map_links_key in st.session_state:
+                with st.expander("🗺️ 地図リンク（場所情報）", expanded=True):
+                    for link in st.session_state[map_links_key][:20]:  # 最大20件まで表示
+                        location = link.get('location', link.get('name', ''))
+                        st.markdown(f"- 📍 **{location}**")
+                        st.markdown(f"  [{link['url']}]({link['url']})")
+                        st.markdown("")  # 空行
+        
+        st.markdown("---")
+        
+        # 1. 旅程（Markdown）
+        # お気に入りの詳細を表示している場合は、重複を避けるためスキップ
+        if not st.session_state.get("showing_favorite_detail", False):
+            itinerary_markdown = output.get("itinerary_markdown", "")
+            if itinerary_markdown:
+                st.markdown("---")
+                st.markdown(itinerary_markdown)
         
         # 2. 参照リンク（sources）
         sources = output.get("sources", [])
