@@ -847,3 +847,4 @@ def _parse_day_plans_from_markdown(markdown: str) -> List[Dict[str, str]]:
         })
     
     return day_plans
+

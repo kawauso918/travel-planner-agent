@@ -450,3 +450,4 @@ def get_knowledge_base() -> KnowledgeBase:
         _knowledge_base = KnowledgeBase()
     return _knowledge_base
 
+

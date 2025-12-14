@@ -955,3 +955,4 @@ def _generate_fallback_comparison_two(error_message: str) -> Dict[str, Any]:
         ],
         "suggested_merge": "評価エラーを解決してから再実行してください"
     }
+

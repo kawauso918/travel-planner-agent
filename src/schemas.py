@@ -255,3 +255,4 @@ class PlanComparisonResult(BaseModel):
     detailed_reasons: List[ComparisonReason] = Field(description="各観点の詳細比較")
     suggested_merge: str = Field(description="AとBの良いところを統合するならどうするか（短く）")
 
+
