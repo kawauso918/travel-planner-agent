@@ -206,3 +206,52 @@ class ComparisonEvaluationResult(BaseModel):
     comparison_summary: str = Field(description="比較サマリー")
     detailed_comparison: Dict[str, Any] = Field(default_factory=dict, description="詳細比較")
 
+
+# ============================================
+# QAレビュー結果スキーマ
+# ============================================
+
+class QAEvaluationIssue(BaseModel):
+    """QA評価の問題点"""
+    severity: str = Field(description="重要度（high/medium/low）")
+    problem: str = Field(description="問題点（具体的）")
+    evidence: str = Field(description="どの部分が問題か（該当箇所の短い引用 or 要約）")
+    fix: str = Field(description="どう直せば良いか（具体策）")
+
+class QAEvaluationScores(BaseModel):
+    """QA評価スコア（各1-5点）"""
+    正確性: int = Field(ge=1, le=5, description="正確性（1-5点）")
+    実現可能性: int = Field(ge=1, le=5, description="実現可能性（1-5点）")
+    テーマ整合性: int = Field(ge=1, le=5, description="テーマ整合性（1-5点）")
+    根拠の明示: int = Field(ge=1, le=5, description="根拠の明示（1-5点）")
+    予算妥当性: int = Field(ge=1, le=5, description="予算妥当性（1-5点）")
+    出力品質: int = Field(ge=1, le=5, description="出力品質（1-5点）")
+
+class QAReviewResult(BaseModel):
+    """QAレビュー結果"""
+    scores: QAEvaluationScores = Field(description="各観点のスコア（1-5点）")
+    total_30: int = Field(ge=0, le=30, description="合計スコア（0-30点）")
+    total_100: float = Field(ge=0, le=100, description="100点換算スコア（0-100点）")
+    good_points: List[str] = Field(default_factory=list, description="良い点（最大3つ）")
+    issues: List[QAEvaluationIssue] = Field(default_factory=list, description="問題点リスト")
+    must_fix_first: List[str] = Field(default_factory=list, description="優先度が最も高い修正点（最大3つ）")
+    rewrite_suggestions: List[str] = Field(default_factory=list, description="改善の方向性（最大3つ）")
+
+
+# ============================================
+# プラン比較結果スキーマ
+# ============================================
+
+class ComparisonReason(BaseModel):
+    """比較理由（各観点）"""
+    criterion: str = Field(description="観点名（正確性、実現可能性等）")
+    better: str = Field(description="どちらが良いか（A/B/tie）")
+    why: str = Field(description="理由")
+
+class PlanComparisonResult(BaseModel):
+    """プラン比較結果"""
+    winner: str = Field(description="勝者（A/B/tie）")
+    reason_summary: str = Field(description="2〜4文で要点")
+    detailed_reasons: List[ComparisonReason] = Field(description="各観点の詳細比較")
+    suggested_merge: str = Field(description="AとBの良いところを統合するならどうするか（短く）")
+
