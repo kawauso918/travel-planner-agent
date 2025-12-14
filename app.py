@@ -235,10 +235,11 @@ def main():
                             with col2:
                                 if st.button("表示", key=f"view_itinerary_{itin.get('id')}"):
                                     # 過去旅程をメイン画面に表示
-                                    st.session_state.current_plan = itin.get('plan_markdown', '')
+                                    itinerary_markdown = itin.get('itinerary_markdown', '')
+                                    st.session_state.current_plan = itinerary_markdown
                                     st.session_state.last_output = {
-                                        "itinerary_markdown": itin.get('plan_markdown', ''),
-                                        "budget_breakdown": {},
+                                        "itinerary_markdown": itinerary_markdown,
+                                        "budget_breakdown": itin.get('metadata', {}).get('budget_breakdown', {}),
                                         "cautions": [],
                                         "sources": [],
                                         "warnings": []
