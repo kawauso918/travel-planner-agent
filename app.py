@@ -70,6 +70,17 @@ def main():
     st.title("✈️ Travel Planner Agent")
     st.markdown("AIを活用した旅行計画作成アシスタント")
     
+    # 日本語メニューをメイン画面に表示
+    menu_col1, menu_col2, menu_col3 = st.columns([1, 1, 6])
+    with menu_col1:
+        if st.button("🔄 再読み込み", use_container_width=True, help="ページを再読み込みします"):
+            st.rerun()
+    with menu_col2:
+        if st.button("⚙️ 設定", use_container_width=True, help="設定はサイドバーから変更できます"):
+            st.info("💡 設定はサイドバーから変更できます")
+    
+    st.divider()
+    
     # サイドバー：入力フォーム
     with st.sidebar:
         st.header("📝 旅行条件")
