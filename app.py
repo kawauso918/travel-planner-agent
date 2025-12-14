@@ -79,7 +79,7 @@ def main():
     st.markdown("AIを活用した旅行計画作成アシスタント")
     
     # 日本語メニューをメイン画面に表示
-    menu_col1, menu_col2, menu_col3 = st.columns([1, 1, 6])
+    menu_col1, menu_col2, _ = st.columns([1, 1, 6])
     with menu_col1:
         if st.button("🔄 再読み込み", use_container_width=True, help="ページを再読み込みします"):
             st.rerun()
@@ -99,7 +99,7 @@ def main():
             st.caption("💡 サイドバーから変更できます")
         
         with st.expander("🔍 検索設定", expanded=True):
-            from src.config import MAX_SEARCH_CALLS, MAX_ITERATIONS, TIMEOUT_SECONDS
+            from src.config import MAX_SEARCH_CALLS, TIMEOUT_SECONDS
             st.write("**検索回数上限**")
             st.caption(f"最大検索回数: {MAX_SEARCH_CALLS}回")
             st.caption("💡 検索結果が0件の場合、自動的にクエリを拡張して再試行します")
@@ -672,7 +672,7 @@ def _display_export_section(output: dict, destination: str, days: int):
             return
         
         # 開始日入力（ICS生成用）
-        col_date1, col_date2 = st.columns(2)
+        col_date1, _ = st.columns(2)
         with col_date1:
             start_date = st.date_input(
                 "📅 旅行開始日（ICS生成用）",
@@ -828,13 +828,13 @@ def _display_export_section(output: dict, destination: str, days: int):
         st.error(f"❌ エクスポート機能の表示でエラーが発生しました: {str(e)}")
 
 
-def _display_plan_output(output: dict):
+def _display_plan_output(output: dict | None):
     """
     旅行計画の出力を表示
-    
+
     Args:
-        output: PlanGenerateOutputスキーマに準拠した辞書
-    
+        output: PlanGenerateOutputスキーマに準拠した辞書、またはNone
+
     注意: 例外が発生しても画面が落ちないようにtry-exceptで囲む
     """
     try:
