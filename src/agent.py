@@ -216,8 +216,9 @@ def run_agent(user_input: Dict[str, Any], memory_enabled: bool = True) -> Dict[s
             memory.add_message("assistant", output.get("itinerary_markdown", ""))
         
         # 過去旅程として保存（RAG用）
+        # 必ず保存する（エラーが発生してもログに記録するだけ）
         try:
-            knowledge_base.save_itinerary(
+            itinerary_id = knowledge_base.save_itinerary(
                 destination=destination,
                 days=days,
                 itinerary_markdown=output.get("itinerary_markdown", ""),
@@ -228,9 +229,10 @@ def run_agent(user_input: Dict[str, Any], memory_enabled: bool = True) -> Dict[s
                     "mobility": mobility
                 }
             )
-            logger.info("過去旅程として保存しました")
+            logger.info(f"過去旅程として保存しました: ID={itinerary_id}, destination={destination}, days={days}")
         except Exception as e:
-            logger.warning(f"過去旅程の保存に失敗: {e}")
+            # 保存に失敗してもエラーを外に出さない（ログに記録するだけ）
+            logger.error(f"過去旅程の保存に失敗: {type(e).__name__}: {str(e)}", exc_info=True)
         
         logger.info("旅行計画生成が正常に完了しました")
         return output
@@ -461,3 +463,4 @@ class TravelPlannerAgent:
         )
         
         return edit_itinerary(edit_input)
+

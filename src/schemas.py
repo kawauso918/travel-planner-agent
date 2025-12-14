@@ -169,3 +169,4 @@ class UserInputSchema(BaseModel):
         if v not in allowed:
             raise ValueError(f'移動手段は {allowed} のいずれかである必要があります')
         return v
+

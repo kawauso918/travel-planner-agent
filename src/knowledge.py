@@ -437,3 +437,4 @@ def get_knowledge_base() -> KnowledgeBase:
     if _knowledge_base is None:
         _knowledge_base = KnowledgeBase()
     return _knowledge_base
+

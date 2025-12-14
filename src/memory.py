@@ -248,3 +248,4 @@ def get_memory(enabled: bool) -> Optional[Memory]:
         return None
     
     return Memory(enabled=True)
+

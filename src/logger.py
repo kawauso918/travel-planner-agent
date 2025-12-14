@@ -106,3 +106,4 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
 
 # デフォルトロガー
 logger = get_logger()
+

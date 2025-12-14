@@ -196,6 +196,8 @@ def main():
             
             with tab3:
                 st.write("**過去旅程**")
+                # 最新データを再読み込み
+                knowledge_base._load_itineraries()
                 # 過去旅程の表示
                 itineraries = knowledge_base.get_itineraries(limit=10)
                 if itineraries:
@@ -253,6 +255,10 @@ def main():
                     st.session_state.last_output = output
                     st.session_state.current_plan = output.get("itinerary_markdown", "")
                     
+                    # 過去旅程を再読み込み（最新データを表示するため）
+                    knowledge_base = get_knowledge_base()
+                    knowledge_base._load_itineraries()
+                    
                     # エラーや警告がある場合は注意喚起
                     if output.get("warnings") or (output.get("sources") and len(output.get("sources", [])) == 0):
                         st.warning("⚠️ 一部の情報が取得できませんでした。注意点をご確認ください。")
@@ -286,6 +292,10 @@ def main():
                     output = run_agent(last_input, memory_enabled=memory_enabled)
                     st.session_state.last_output = output
                     st.session_state.current_plan = output.get("itinerary_markdown", "")
+                    
+                    # 過去旅程を再読み込み（最新データを表示するため）
+                    knowledge_base = get_knowledge_base()
+                    knowledge_base._load_itineraries()
                     
                     # エラーや警告がある場合は注意喚起
                     if output.get("warnings") or (output.get("sources") and len(output.get("sources", [])) == 0):
