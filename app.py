@@ -146,14 +146,35 @@ def main():
                 if favorites:
                     for fav in favorites:
                         with st.container():
-                            col1, col2 = st.columns([4, 1])
+                            col1, col2, col3 = st.columns([3, 1, 1])
                             with col1:
                                 st.write(f"**{fav.get('name')}** ({fav.get('category')})")
                                 if fav.get('location'):
                                     st.caption(f"📍 {fav.get('location')}")
                                 if fav.get('notes'):
-                                    st.caption(f"📝 {fav.get('notes')}")
+                                    st.caption(f"📝 {fav.get('notes')[:100]}{'...' if len(fav.get('notes', '')) > 100 else ''}")
                             with col2:
+                                if st.button("詳細", key=f"view_fav_{fav.get('id')}"):
+                                    # お気に入りの詳細をメイン画面に表示
+                                    detail_text = f"## 📌 {fav.get('name')}\n\n"
+                                    detail_text += f"**カテゴリ:** {fav.get('category')}\n\n"
+                                    if fav.get('location'):
+                                        detail_text += f"**場所:** {fav.get('location')}\n\n"
+                                    if fav.get('notes'):
+                                        detail_text += f"**メモ:**\n{fav.get('notes')}\n\n"
+                                    if fav.get('url'):
+                                        detail_text += f"**リンク:** [{fav.get('url')}]({fav.get('url')})\n\n"
+
+                                    st.session_state.current_plan = detail_text
+                                    st.session_state.last_output = {
+                                        "itinerary_markdown": detail_text,
+                                        "budget_breakdown": {},
+                                        "cautions": [],
+                                        "sources": [],
+                                        "warnings": []
+                                    }
+                                    st.rerun()
+                            with col3:
                                 if st.button("削除", key=f"del_fav_{fav.get('id')}"):
                                     knowledge_base.remove_favorite(fav.get('id'))
                                     st.rerun()
@@ -203,7 +224,7 @@ def main():
                 if itineraries:
                     for itin in itineraries:
                         with st.container():
-                            col1, col2 = st.columns([4, 1])
+                            col1, col2, col3 = st.columns([3, 1, 1])
                             with col1:
                                 st.write(f"**{itin.get('destination')} {itin.get('days')}日プラン**")
                                 st.caption(f"作成日: {itin.get('created_at', '')[:10]}")
@@ -212,6 +233,18 @@ def main():
                                     if meta.get('themes'):
                                         st.caption(f"テーマ: {', '.join(meta.get('themes', []))}")
                             with col2:
+                                if st.button("表示", key=f"view_itinerary_{itin.get('id')}"):
+                                    # 過去旅程をメイン画面に表示
+                                    st.session_state.current_plan = itin.get('plan_markdown', '')
+                                    st.session_state.last_output = {
+                                        "itinerary_markdown": itin.get('plan_markdown', ''),
+                                        "budget_breakdown": {},
+                                        "cautions": [],
+                                        "sources": [],
+                                        "warnings": []
+                                    }
+                                    st.rerun()
+                            with col3:
                                 if st.button("削除", key=f"del_itinerary_{itin.get('id')}"):
                                     knowledge_base.remove_itinerary(itin.get('id'))
                                     st.rerun()
