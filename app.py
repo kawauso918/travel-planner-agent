@@ -22,6 +22,8 @@ if "show_edit_form" not in st.session_state:
     st.session_state.show_edit_form = False
 if "edit_applied" not in st.session_state:
     st.session_state.edit_applied = False
+if "show_settings" not in st.session_state:
+    st.session_state.show_settings = False
 
 
 def _handle_error(e: Exception, context: str, user_message: str = None) -> None:
@@ -76,8 +78,71 @@ def main():
         if st.button("🔄 再読み込み", use_container_width=True, help="ページを再読み込みします"):
             st.rerun()
     with menu_col2:
-        if st.button("⚙️ 設定", use_container_width=True, help="設定はサイドバーから変更できます"):
-            st.info("💡 設定はサイドバーから変更できます")
+        if st.button("⚙️ 設定", use_container_width=True, help="設定を開きます"):
+            st.session_state.show_settings = not st.session_state.show_settings
+    
+    # 設定画面の表示
+    if st.session_state.show_settings:
+        st.divider()
+        st.subheader("⚙️ 設定")
+        
+        with st.expander("📊 アプリケーション設定", expanded=True):
+            st.write("**Memory機能**")
+            st.caption("Memory機能を有効にすると、過去の会話履歴を参照してよりパーソナライズされた提案が可能になります。")
+            st.caption(f"現在の状態: {'✅ 有効' if st.session_state.memory_enabled else '❌ 無効'}")
+            st.caption("💡 サイドバーから変更できます")
+        
+        with st.expander("🔍 検索設定", expanded=True):
+            from src.config import MAX_SEARCH_CALLS, MAX_ITERATIONS, TIMEOUT_SECONDS
+            st.write("**検索回数上限**")
+            st.caption(f"最大検索回数: {MAX_SEARCH_CALLS}回")
+            st.caption("💡 検索結果が0件の場合、自動的にクエリを拡張して再試行します")
+            
+            st.write("**タイムアウト設定**")
+            st.caption(f"タイムアウト時間: {TIMEOUT_SECONDS}秒")
+            st.caption("💡 検索がタイムアウトした場合、エラーメッセージを表示します")
+        
+        with st.expander("💾 データ管理", expanded=True):
+            st.write("**保存データ**")
+            knowledge_base = get_knowledge_base()
+            favorites_count = len(knowledge_base.get_favorites())
+            memos_count = len(knowledge_base.get_memos())
+            itineraries_count = len(knowledge_base.get_itineraries())
+            
+            st.caption(f"お気に入り: {favorites_count}件")
+            st.caption(f"旅行メモ: {memos_count}件")
+            st.caption(f"過去旅程: {itineraries_count}件")
+            st.caption("💡 サイドバーの「📚 マイナレッジ」から管理できます")
+        
+        with st.expander("📝 ログ設定", expanded=True):
+            st.write("**ログファイル**")
+            st.caption("ログファイルは `logs/` ディレクトリに保存されます")
+            st.caption("💡 エラーが発生した場合、ログファイルを確認してください")
+            
+            if st.button("ログディレクトリを開く", use_container_width=True):
+                st.info("💡 ログファイルは `logs/travel_planner_YYYYMMDD.log` の形式で保存されます")
+        
+        with st.expander("ℹ️ アプリケーション情報", expanded=False):
+            st.write("**バージョン情報**")
+            st.caption("Travel Planner Agent v1.0")
+            st.caption("AIを活用した旅行計画作成アシスタント")
+            
+            st.write("**技術スタック**")
+            st.caption("• Streamlit: Webアプリケーションフレームワーク")
+            st.caption("• OpenAI GPT-4: LLMによる旅程生成")
+            st.caption("• SerpAPI: Web検索による最新情報取得")
+            st.caption("• LangChain: LLM統合フレームワーク")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("設定を閉じる", use_container_width=True):
+                st.session_state.show_settings = False
+                st.rerun()
+        with col2:
+            if st.button("ページを再読み込み", use_container_width=True):
+                st.rerun()
+        
+        st.divider()
     
     st.divider()
     
@@ -217,7 +282,7 @@ def main():
                 # メモの追加
                 with st.form("add_memo_form"):
                     memo_title = st.text_input("タイトル *", key="memo_title")
-                    memo_content = st.text_area("内容 *", key="memo_content")
+                    memo_content = st.text_area("内容 *", key="memo_content", height=150)
                     memo_tags = st.text_input("タグ（カンマ区切り）", key="memo_tags")
                     if st.form_submit_button("追加"):
                         if memo_title and memo_content:
@@ -230,20 +295,68 @@ def main():
                 memos = knowledge_base.get_memos()
                 if memos:
                     for memo in memos:
-                        with st.container():
-                            col1, col2 = st.columns([4, 1])
-                            with col1:
-                                st.write(f"**{memo.get('title')}**")
-                                st.caption(memo.get('content', '')[:200])
-                                if memo.get('tags'):
-                                    st.caption(f"🏷️ {', '.join(memo.get('tags', []))}")
-                            with col2:
-                                if st.button("削除", key=f"del_memo_{memo.get('id')}"):
-                                    knowledge_base.remove_memo(memo.get('id'))
-                                    st.rerun()
-                            st.divider()
+                        memo_id = memo.get('id')
+                        memo_title = memo.get('title', '')
+                        memo_content = memo.get('content', '')
+                        memo_tags = memo.get('tags', [])
+                        memo_created = memo.get('created_at', '')
+                        memo_updated = memo.get('updated_at', '')
+                        
+                        # メモの表示
+                        with st.expander(f"📝 {memo_title}", expanded=False):
+                            # タグの表示
+                            if memo_tags:
+                                tag_str = " ".join([f"`{tag}`" for tag in memo_tags])
+                                st.markdown(f"**タグ:** {tag_str}")
+                            
+                            # 内容の表示
+                            st.markdown("**内容:**")
+                            st.text_area("", value=memo_content, height=150, key=f"memo_content_display_{memo_id}", disabled=True)
+                            
+                            # 日付情報
+                            if memo_created:
+                                st.caption(f"作成日: {memo_created[:10] if len(memo_created) >= 10 else memo_created}")
+                            if memo_updated and memo_updated != memo_created:
+                                st.caption(f"更新日: {memo_updated[:10] if len(memo_updated) >= 10 else memo_updated}")
+                            
+                            # 編集フォーム
+                            edit_key = f"edit_memo_{memo_id}"
+                            if edit_key not in st.session_state:
+                                st.session_state[edit_key] = False
+                            
+                            if st.button("✏️ 編集", key=f"edit_btn_{memo_id}"):
+                                st.session_state[edit_key] = True
+                            
+                            if st.session_state[edit_key]:
+                                with st.form(f"edit_memo_form_{memo_id}"):
+                                    edit_title = st.text_input("タイトル *", value=memo_title, key=f"edit_title_{memo_id}")
+                                    edit_content = st.text_area("内容 *", value=memo_content, height=150, key=f"edit_content_{memo_id}")
+                                    edit_tags_str = st.text_input("タグ（カンマ区切り）", value=", ".join(memo_tags), key=f"edit_tags_{memo_id}")
+                                    
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        if st.form_submit_button("保存", type="primary", use_container_width=True):
+                                            if edit_title and edit_content:
+                                                edit_tags = [t.strip() for t in edit_tags_str.split(",") if t.strip()] if edit_tags_str else []
+                                                knowledge_base.update_memo(memo_id, edit_title, edit_content, edit_tags)
+                                                st.success(f"✅ {edit_title}を更新しました")
+                                                st.session_state[edit_key] = False
+                                                st.rerun()
+                                    with col2:
+                                        if st.form_submit_button("キャンセル", use_container_width=True):
+                                            st.session_state[edit_key] = False
+                                            st.rerun()
+                        
+                        # 削除ボタン
+                        col1, col2, col3 = st.columns([1, 1, 1])
+                        with col3:
+                            if st.button("削除", key=f"del_memo_{memo_id}"):
+                                knowledge_base.remove_memo(memo_id)
+                                st.success(f"✅ {memo_title}を削除しました")
+                                st.rerun()
+                        st.divider()
                 else:
-                    st.info("メモがありません")
+                    st.info("旅行メモがありません")
             
             with tab3:
                 st.write("**過去旅程**")

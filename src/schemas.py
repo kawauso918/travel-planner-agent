@@ -170,3 +170,39 @@ class UserInputSchema(BaseModel):
             raise ValueError(f'移動手段は {allowed} のいずれかである必要があります')
         return v
 
+
+# ============================================
+# 評価結果スキーマ（LLM as a Judge）
+# ============================================
+
+class EvaluationScores(BaseModel):
+    """評価スコア（6つの観点）"""
+    appropriateness: float = Field(ge=0, le=100, description="適切性（0-100）")
+    feasibility: float = Field(ge=0, le=100, description="実現可能性（0-100）")
+    accuracy: float = Field(ge=0, le=100, description="情報の正確性（0-100）")
+    completeness: float = Field(ge=0, le=100, description="構造の完全性（0-100）")
+    budget_validity: float = Field(ge=0, le=100, description="予算の妥当性（0-100）")
+    warnings_adequacy: float = Field(ge=0, le=100, description="注意点の適切性（0-100）")
+
+class ScoreEvaluationResult(BaseModel):
+    """スコア評価結果"""
+    overall_score: float = Field(ge=0, le=100, description="総合スコア（0-100）")
+    scores: EvaluationScores = Field(description="各観点のスコア")
+    feedback: str = Field(description="フィードバック")
+    strengths: List[str] = Field(default_factory=list, description="強みリスト")
+    improvements: List[str] = Field(default_factory=list, description="改善点リスト")
+
+class PlanRanking(BaseModel):
+    """計画の順位情報"""
+    plan_id: int = Field(ge=0, le=4, description="計画のID（0-4）")
+    rank: int = Field(ge=1, le=5, description="順位（1-5）")
+    score: float = Field(ge=0, le=100, description="スコア（0-100）")
+    reason: str = Field(description="順位の理由")
+
+class ComparisonEvaluationResult(BaseModel):
+    """比較評価結果"""
+    rankings: List[PlanRanking] = Field(description="順位リスト")
+    best_plan_id: int = Field(ge=0, le=4, description="最良の計画のID")
+    comparison_summary: str = Field(description="比較サマリー")
+    detailed_comparison: Dict[str, Any] = Field(default_factory=dict, description="詳細比較")
+
