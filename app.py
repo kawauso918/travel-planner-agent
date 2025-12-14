@@ -45,8 +45,23 @@ def main():
     st.set_page_config(
         page_title="Travel Planner Agent",
         page_icon="✈️",
-        layout="wide"
+        layout="wide",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': None
+        }
     )
+    
+    # Streamlitのデフォルトメニューを非表示にする（CSS）
+    hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
     
     st.title("✈️ Travel Planner Agent")
     st.markdown("AIを活用した旅行計画作成アシスタント")
@@ -347,57 +362,82 @@ def main():
         if st.session_state.current_plan is None:
             st.warning("⚠️ 最初に「旅程を生成」を実行してください")
         else:
-            st.divider()
-            st.subheader("✏️ 旅程の修正")
+            # 編集ボタンが押されたら編集フォームを表示
+            st.session_state.show_edit_form = True
             
-            edit_request = st.text_area(
-                "修正内容を入力してください",
-                placeholder="例: Day1の昼食をフレンチに変更したい",
-                height=100
-            )
-            
-            if st.button("修正を適用", type="primary"):
-                if not edit_request:
-                    st.warning("⚠️ 修正内容を入力してください")
-                else:
-                    try:
-                        with st.spinner("旅程を修正中..."):
-                            edit_input = PlanEditInput(
-                                current_plan=st.session_state.current_plan,
-                                user_request=edit_request,
-                                additional_search=False
-                            )
+            # 編集フォームの表示状態を管理
+            if st.session_state.show_edit_form:
+                st.divider()
+                st.subheader("✏️ 旅程の修正")
+                
+                edit_request = st.text_area(
+                    "修正内容を入力してください",
+                    placeholder="例: Day1の昼食をフレンチに変更したい",
+                    height=100
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("修正を適用", type="primary", use_container_width=True):
+                        if not edit_request:
+                            st.warning("⚠️ 修正内容を入力してください")
+                        else:
+                            try:
+                                with st.spinner("旅程を修正中..."):
+                                    edit_input = PlanEditInput(
+                                        current_plan=st.session_state.current_plan,
+                                        user_request=edit_request,
+                                        additional_search=False
+                                    )
+                                    
+                                    edit_output = edit_itinerary(edit_input)
+                                    
+                                    # 更新後の計画を保存
+                                    updated_plan = edit_output.get("updated_plan", "")
+                                    st.session_state.current_plan = updated_plan
+                                    st.session_state.last_output = {
+                                        "itinerary_markdown": updated_plan,
+                                        "budget_breakdown": st.session_state.last_output.get("budget_breakdown", {}) if st.session_state.last_output else {},
+                                        "cautions": edit_output.get("change_log", []) + (st.session_state.last_output.get("cautions", []) if st.session_state.last_output else []),
+                                        "sources": edit_output.get("new_sources", []) + (st.session_state.last_output.get("sources", []) if st.session_state.last_output else []),
+                                        "warnings": st.session_state.last_output.get("warnings", []) if st.session_state.last_output else []
+                                    }
+                                    
+                                    # 編集フォームを閉じる
+                                    st.session_state.show_edit_form = False
+                                    
+                                    st.success("✅ 旅程が修正されました！")
+                                    
+                                    # 変更履歴を表示
+                                    if edit_output.get("change_log"):
+                                        st.info("📝 変更履歴:")
+                                        for change in edit_output["change_log"]:
+                                            st.write(f"- {change}")
+                                    
+                                    # 修正後の旅程を表示
+                                    _display_plan_output(st.session_state.last_output)
+                                    
+                                    st.rerun()
                             
-                            edit_output = edit_itinerary(edit_input)
-                            
-                            # 更新後の計画を保存
-                            st.session_state.current_plan = edit_output.get("updated_plan", "")
-                            st.session_state.last_output = {
-                                "itinerary_markdown": edit_output.get("updated_plan", ""),
-                                "budget_breakdown": {},
-                                "cautions": edit_output.get("change_log", []),
-                                "sources": edit_output.get("new_sources", []),
-                                "warnings": []
-                            }
-                            
-                            st.success("✅ 旅程が修正されました！")
-                            
-                            # 変更履歴を表示
-                            if edit_output.get("change_log"):
-                                st.info("📝 変更履歴:")
-                                for change in edit_output["change_log"]:
-                                    st.write(f"- {change}")
-                            
-                            _display_plan_output(st.session_state.last_output)
-                    
-                    except Exception as e:
-                        _handle_error(e, "旅程編集", "💡 修正内容を変更するか、しばらく時間をおいてから再度お試しください。")
+                            except Exception as e:
+                                _handle_error(e, "旅程編集", "💡 修正内容を変更するか、しばらく時間をおいてから再度お試しください。")
+                
+                with col2:
+                    if st.button("キャンセル", use_container_width=True):
+                        st.session_state.show_edit_form = False
+                        st.rerun()
+            else:
+                # 編集フォームを閉じた後は修正後の旅程を表示
+                if st.session_state.last_output:
+                    _display_plan_output(st.session_state.last_output)
     
-    # 既存の計画を表示
-    if st.session_state.last_output and not (generate_btn or regenerate_btn or edit_btn):
-        st.divider()
-        st.subheader("📋 現在の旅行計画")
-        _display_plan_output(st.session_state.last_output)
+    # 既存の計画を表示（編集ボタンが押されていない、または編集フォームが閉じられている場合）
+    if st.session_state.last_output and not generate_btn and not regenerate_btn:
+        # 編集ボタンが押されていない、または編集フォームが閉じられている場合に表示
+        if not edit_btn or (edit_btn and not st.session_state.get("show_edit_form", False)):
+            st.divider()
+            st.subheader("📋 現在の旅行計画")
+            _display_plan_output(st.session_state.last_output)
 
 
 def _display_plan_output(output: dict):
