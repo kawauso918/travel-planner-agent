@@ -518,6 +518,49 @@ def generate_pdf(
         if in_table and table_rows:
             _add_table_to_story(story, table_rows, normal_style, japanese_font)
         
+        # 地図リンクセクションを追加
+        story.append(Spacer(1, 12))
+        story.append(PageBreak())
+        story.append(Paragraph("🗺️ 地図リンク", heading_style))
+        story.append(Spacer(1, 8))
+        
+        # 地図リンクを生成
+        try:
+            map_links = generate_map_links(itinerary_markdown, destination)
+            if map_links:
+                for link in map_links[:20]:  # 最大20件まで
+                    location = link.get('location', link.get('name', ''))
+                    url = link.get('url', '')
+                    if location and url:
+                        # 地図リンクをPDFに追加
+                        link_text = f"📍 {location}"
+                        link_para = Paragraph(
+                            f'{link_text} - <link href="{url}" color="blue"><u>{url}</u></link>',
+                            normal_style
+                        )
+                        story.append(link_para)
+                        story.append(Spacer(1, 4))
+            else:
+                # 目的地の地図リンクのみ追加
+                destination_url = build_google_maps_url(destination)
+                link_para = Paragraph(
+                    f'📍 {destination} - <link href="{destination_url}" color="blue"><u>{destination_url}</u></link>',
+                    normal_style
+                )
+                story.append(link_para)
+        except Exception as e:
+            logger.warning(f"PDFへの地図リンク追加でエラー: {str(e)}")
+            # エラー時でも目的地のリンクは追加
+            try:
+                destination_url = build_google_maps_url(destination)
+                link_para = Paragraph(
+                    f'📍 {destination} - <link href="{destination_url}" color="blue"><u>{destination_url}</u></link>',
+                    normal_style
+                )
+                story.append(link_para)
+            except:
+                pass
+        
         # PDFを生成
         doc.build(story)
         
@@ -664,8 +707,22 @@ def generate_ics(
                         description = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', description)
                     description = description.strip()
                 
+                # 地図リンクを追加
+                try:
+                    day_map_links = generate_map_links(description, destination)
+                    if day_map_links:
+                        map_links_text = "\n\n地図リンク:\n"
+                        for link in day_map_links[:5]:  # 最大5件まで
+                            location = link.get('location', link.get('name', ''))
+                            url = link.get('url', '')
+                            if location and url:
+                                map_links_text += f"- {location}: {url}\n"
+                        description += map_links_text
+                except Exception as e:
+                    logger.warning(f"ICSへの地図リンク追加でエラー: {str(e)}")
+                
                 if description:
-                    event.add('description', description[:1000])
+                    event.add('description', description[:2000])  # 説明文の上限を2000文字に拡張
                 else:
                     event.add('description', f"{destination} {day_num}日目の旅程")
                 
@@ -847,4 +904,7 @@ def _parse_day_plans_from_markdown(markdown: str) -> List[Dict[str, str]]:
         })
     
     return day_plans
+
+
+
 

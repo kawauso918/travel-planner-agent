@@ -9,6 +9,7 @@ from src.schemas import PlanEditInput
 from src.knowledge import get_knowledge_base
 from src.logger import get_logger
 from src.export import generate_pdf, generate_ics, generate_map_links, _build_pdf_title, _sanitize_filename, build_google_maps_url
+from src.evaluator import evaluate_plan_score
 from datetime import datetime
 
 logger = get_logger("app")
@@ -30,6 +31,10 @@ if "edit_applied" not in st.session_state:
     st.session_state.edit_applied = False
 if "show_settings" not in st.session_state:
     st.session_state.show_settings = False
+if "evaluation_result" not in st.session_state:
+    st.session_state.evaluation_result = None
+if "show_evaluation" not in st.session_state:
+    st.session_state.show_evaluation = False
 
 
 def _handle_error(e: Exception, context: str, user_message: str = None) -> None:
@@ -497,10 +502,35 @@ def main():
                     else:
                         st.success("✅ 旅行計画が作成されました！")
                     
+                    # Judge評価を実行
+                    try:
+                        with st.spinner("旅程の実用性を評価中..."):
+                            user_requirements = {
+                                "destination": destination,
+                                "days": days,
+                                "budget_total": budget_total if budget_total > 0 else None,
+                                "themes": themes,
+                                "style": style,
+                                "constraints": constraints
+                            }
+                            evaluation_result = evaluate_plan_score(output, user_requirements)
+                            st.session_state.evaluation_result = evaluation_result
+                            st.session_state.show_evaluation = True
+                    except Exception as e:
+                        logger.error(f"Judge評価でエラーが発生: {str(e)}", exc_info=True)
+                        st.session_state.evaluation_result = None
+                        st.session_state.show_evaluation = False
+                    
                     # エクスポート機能を自動表示
                     st.divider()
                     st.subheader("📤 エクスポート・地図リンク")
                     _display_export_section(output, destination, days)
+                    
+                    # Judge評価結果を表示
+                    if st.session_state.show_evaluation and st.session_state.evaluation_result:
+                        st.divider()
+                        st.subheader("📊 旅程評価結果")
+                        _display_evaluation_result(st.session_state.evaluation_result)
                     
                     st.divider()
                     st.subheader("📋 生成された旅行計画")
@@ -553,10 +583,35 @@ def main():
                     else:
                         st.success("✅ 別案の旅行計画が作成されました！")
                     
+                    # Judge評価を実行
+                    try:
+                        with st.spinner("旅程の実用性を評価中..."):
+                            user_requirements = {
+                                "destination": last_input.get("destination", "旅行先"),
+                                "days": days,
+                                "budget_total": budget_total if budget_total > 0 else None,
+                                "themes": themes,
+                                "style": style,
+                                "constraints": constraints
+                            }
+                            evaluation_result = evaluate_plan_score(output, user_requirements)
+                            st.session_state.evaluation_result = evaluation_result
+                            st.session_state.show_evaluation = True
+                    except Exception as e:
+                        logger.error(f"Judge評価でエラーが発生: {str(e)}", exc_info=True)
+                        st.session_state.evaluation_result = None
+                        st.session_state.show_evaluation = False
+                    
                     # エクスポート機能を自動表示
                     st.divider()
                     st.subheader("📤 エクスポート・地図リンク")
                     _display_export_section(output, last_input.get("destination", "旅行先"), days)
+                    
+                    # Judge評価結果を表示
+                    if st.session_state.show_evaluation and st.session_state.evaluation_result:
+                        st.divider()
+                        st.subheader("📊 旅程評価結果")
+                        _display_evaluation_result(st.session_state.evaluation_result)
                     
                     st.divider()
                     st.subheader("📋 再生成された旅行計画")
@@ -1087,6 +1142,67 @@ def _translate_budget_key(key: str) -> str:
         "other": "その他"
     }
     return translations.get(key, key)
+
+
+def _display_evaluation_result(evaluation_result: dict):
+    """
+    Judge評価結果を表示
+    
+    Args:
+        evaluation_result: 評価結果の辞書
+    """
+    try:
+        overall_score = evaluation_result.get("overall_score", 0)
+        scores = evaluation_result.get("scores", {})
+        feedback = evaluation_result.get("feedback", "")
+        strengths = evaluation_result.get("strengths", [])
+        improvements = evaluation_result.get("improvements", [])
+        
+        # 総合スコアを表示
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("総合スコア", f"{overall_score:.1f}/100")
+        with col2:
+            appropriateness = scores.get("appropriateness", 0)
+            st.metric("適切性", f"{appropriateness:.1f}/100")
+        with col3:
+            feasibility = scores.get("feasibility", 0)
+            st.metric("実現可能性", f"{feasibility:.1f}/100")
+        
+        # 各観点のスコアを表示
+        st.markdown("### 各観点のスコア")
+        score_cols = st.columns(3)
+        with score_cols[0]:
+            st.write(f"**情報の正確性**: {scores.get('accuracy', 0):.1f}/100")
+            st.write(f"**構造の完全性**: {scores.get('completeness', 0):.1f}/100")
+        with score_cols[1]:
+            st.write(f"**予算の妥当性**: {scores.get('budget_validity', 0):.1f}/100")
+            st.write(f"**注意点の適切性**: {scores.get('warnings_adequacy', 0):.1f}/100")
+        
+        # フィードバック
+        if feedback:
+            st.markdown("### フィードバック")
+            st.info(feedback)
+        
+        # 強み
+        if strengths:
+            st.markdown("### ✅ 強み")
+            for strength in strengths:
+                st.write(f"- {strength}")
+        
+        # 改善点
+        if improvements:
+            st.markdown("### 💡 改善点")
+            for improvement in improvements:
+                st.write(f"- {improvement}")
+            
+            # 改善版の旅程を再生成するボタン（任意）
+            if st.button("🔄 改善版の旅程を再生成", use_container_width=True, key="regenerate_improved_btn"):
+                st.info("💡 改善点を参考に、旅程を再生成してください。サイドバーから条件を調整して「🔄 別案を生成（再生成）」ボタンを押してください。")
+    
+    except Exception as e:
+        logger.error(f"評価結果の表示でエラーが発生: {str(e)}", exc_info=True)
+        st.error(f"❌ 評価結果の表示でエラーが発生しました: {str(e)}")
 
 
 if __name__ == "__main__":

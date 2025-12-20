@@ -256,3 +256,6 @@ class PlanComparisonResult(BaseModel):
     suggested_merge: str = Field(description="AとBの良いところを統合するならどうするか（短く）")
 
 
+
+
+
